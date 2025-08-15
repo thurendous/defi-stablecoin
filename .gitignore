@@ -2,17 +2,32 @@
 cache/
 out/
 
+# IDE files
+.vscode/
+
 # Ignores development broadcast logs
-!/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 
 # Docs
 docs/
 
-# Dotenv file
+# Environment files (sensitive data)
 .env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+*.env
+.envrc
+.secrets
 
+# Private keys and sensitive files
+*.key
+*.pem
+private.json
+secrets.json
 
-# broadcast
-/broadcast/
+# Broadcast files
+broadcast/
