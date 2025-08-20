@@ -58,41 +58,36 @@ contract DSCEngine is ReentrancyGuard {
     ////// Errors & Events //////
     /////////////////////////////
     error DSCEngine__TokenAddressesAndPriceFeedsLengthsMustBeTheSame();
-    error DSCEngine__TokenNotAllowed();
-    error DSCEngine__NotEnoughCollateral();
-    error DSCEngine__HealthFactorOk();
-    error DSCEngine__HealthFactorNotImproved();
     error DSCEngine__NeedsMoreThanZero();
+    error DSCEngine__TokenNotAllowed(address token);
+    error DSCEngine__NotEnoughCollateral();
     error DSCEngine__TransferFailed();
+    error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
     error DSCEngine__CollateralValueMustBeGreaterThanZero();
     error DSCEngine__HealthFactorIsBroken();
     error DSCEngine__MintFailed();
 
-
-    // events
-    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
-
-
-
     //////////////////////////////
     ////// State Variables ///////
     //////////////////////////////
+    // immutable variables are set in the constructor and cannot be changed
+    DecentralizedStableCoin private immutable I_DSC;
+
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // this means you need to be 200% collateralized to get a loan
+    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10; // this is for adding the price feed in order to make it 1e18
+    uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1;
 
     mapping(address token => address priceFeed) private s_priceFeeds;
     mapping(address token => bool isAllowed) private s_allowedTokens;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
-    mapping(address user => uint256 amountDscMinted) private s_DSCMinted;
-
-    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
-    uint256 private constant PRECISION = 1e18;
-    uint256 private constant LIQUIDATION_THRESHOLD = 50;
-    uint256 private constant LIQUIDATION_PRECISION = 100;
-    uint256 private constant MIN_HEALTH_FACTOR = 1;
+    mapping(address user => uint256 amount) private s_DSCMinted;
 
     address[] private s_collateralTokens;
 
-    // immutable variables are set in the constructor and cannot be changed
-    DecentralizedStableCoin private immutable I_DSC;
+    // events
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
 
     ////////////////////////
     ////// Modifiers ///////
@@ -106,7 +101,7 @@ contract DSCEngine is ReentrancyGuard {
 
     modifier isAllowedToken(address tokenAddress) {
         if (s_allowedTokens[tokenAddress] == false) {
-            revert DSCEngine__TokenNotAllowed();
+            revert DSCEngine__TokenNotAllowed(tokenAddress);
         }
         _;
     }
@@ -133,12 +128,27 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////////////////
     ////// External Functions /////
     ///////////////////////////////
+    /// @notice Deposit Collateral and Mint DSC in one transaction
+    /// @param tokenCollateralAddress The address of the token being deposited
+    /// @param amountCollateral The amount of the token being deposited
+    /// @param amountDscToMint The amount of DSC to mint
+    /// @dev The amount of collateral deposited should be greater than 0
+    /// @dev The amount of DSC to mint should be greater than 0. The health factor should be ok. Or not, it will revert.
+    function depositCollateralAndMintDSC(
+        address tokenCollateralAddress,
+        uint256 amountCollateral,
+        uint256 amountDscToMint
+    ) external moreThanZero(amountCollateral) moreThanZero(amountDscToMint) {
+        depositCollateral(tokenCollateralAddress, amountCollateral);
+        mintDsc(amountDscToMint);
+    }
+
     /// @notice Deposit Collateral for DSC
     /// @param tokenCollateralAddress The address of the token being deposited
     /// @param amountCollateral The amount of the token being deposited
     /// @dev The amount of collateral deposited should be greater than 0
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral)
-        external
+        public
         isAllowedToken(tokenCollateralAddress)
         moreThanZero(amountCollateral)
         nonReentrant
@@ -151,10 +161,10 @@ contract DSCEngine is ReentrancyGuard {
         if (!success) revert DSCEngine__TransferFailed();
     }
 
-    function depositCollateralAndMintDSC() public { }
-
     function redeemCollateralForDSC() public { }
 
+    /// in order to redeem collateral:
+    // 1. health factor must be over 1 AFTER collateral is pulled
     function redeemCollateral() public { }
 
     /// @notice Mint DSC by depositing collateral
@@ -162,7 +172,7 @@ contract DSCEngine is ReentrancyGuard {
     /// @param amountDscToMint The amount of DSC to mint
     /// @dev The amount of DSC to mint should be greater than 0
     /// @notice they must have more collateral than the minimum threshold
-    function mintDsc(uint256 amountDscToMint) external moreThanZero(amountDscToMint) nonReentrant {
+    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
         s_DSCMinted[msg.sender] += amountDscToMint;
 
         _revertIfHealthFactorIsBroken(msg.sender);
@@ -217,25 +227,25 @@ contract DSCEngine is ReentrancyGuard {
 
     ///////////////////////////////////////////////
     ////// Public & External View Functions //////
-    ///////////////////////////////////////////////
+    //////////////////////////////////////////////
     function getAccountCollateralValueInUsd(address user) public view returns (uint256) {
         uint256 totalCollateralValueInUsd;
         for (uint256 i; i < s_collateralTokens.length; ++i) {
             address token = s_collateralTokens[i];
             uint256 tokenAmount = s_collateralDeposited[user][token];
-            totalCollateralValueInUsd += getTokenValueInUsd(token, tokenAmount);
+            totalCollateralValueInUsd += getUsdValue(token, tokenAmount);
         }
         return totalCollateralValueInUsd;
     }
 
-    function getTokenAmountFromUsd(address token, uint256 usdAmountInWei) public view returns (uint256) {
-        // loop through each collateral token, get the amount they have deposited, and map it to the price to get the USD value.
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
-        (, int256 price,,,) = priceFeed.latestRoundData();
-        return ((usdAmountInWei * ADDITIONAL_FEED_PRECISION) / (uint256(price) * PRECISION));
-    }
+    // function getTokenAmountFromUsd(address token, uint256 usdAmountInWei) public view returns (uint256) {
+    //     // loop through each collateral token, get the amount they have deposited, and map it to the price to get the USD value.
+    //     AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
+    //     (, int256 price,,,) = priceFeed.latestRoundData();
+    //     return ((usdAmountInWei * ADDITIONAL_FEED_PRECISION) / (uint256(price) * PRECISION));
+    // }
 
-    function getTokenValueInUsd(address token, uint256 amount) public view returns (uint256) {
+    function getUsdValue(address token, uint256 amount) public view returns (uint256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
         (, int256 price,,,) = priceFeed.latestRoundData();
         // 2500 * 1e18 * 1e10 / 1e18

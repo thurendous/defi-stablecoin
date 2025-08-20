@@ -4,13 +4,13 @@ pragma solidity ^0.8.20;
 import { Script } from "forge-std/Script.sol";
 import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
 import {ERC20Mock} from "../test/mocks/ERC20Mock.sol";
-
+import {console} from "forge-std/console.sol";
 
 contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
 
     uint8 public constant DECIMALS = 8;
-    int256 public constant ETH_USD_PRICE = 2000e8;
+    int256 public constant ETH_USD_PRICE = 2000e8; // chainlink pricefeed's decimals is 8
     int256 public constant BTC_USD_PRICE = 1000e8;
 
     struct NetworkConfig {
@@ -37,7 +37,7 @@ contract HelperConfig is Script {
             wbtcUsdPriceFeed: 0x1b44F3514812d835EB1BDB0acB33d3fA3351Ee43,
             weth: 0xdd13E55209Fd76AfE204dBda4007C227904f0a81,
             wbtc: 0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063,
-            deployerKey: vm.envUint("PRIVATE_KEY")
+            deployerKey: vm.envUint("DEV_PRIVATE_KEY")
         });
     }
 
@@ -54,10 +54,14 @@ contract HelperConfig is Script {
         MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(DECIMALS, BTC_USD_PRICE);
         ERC20Mock wbtcMock = new ERC20Mock("WBTC", "WBTC", msg.sender, 1000e8);
         vm.stopBroadcast();
+        
+        // console.log("wethUsdPriceFeed: ", address(ethUsdPriceFeed));
+        (,int256 price,,,) = ethUsdPriceFeed.latestRoundData();
+        console.log("price: ", price);
 
         anvilNetworkConfig = NetworkConfig({
             wethUsdPriceFeed: address(ethUsdPriceFeed), // ETH / USD
-            wbtcUsdPriceFeed: address(btcUsdPriceFeed),
+            wbtcUsdPriceFeed: address(btcUsdPriceFeed), // BTC / USD
             weth: address(wethMock),
             wbtc: address(wbtcMock),
             deployerKey: DEFAULT_ANVIL_PRIVATE_KEY
