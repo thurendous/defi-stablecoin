@@ -2,9 +2,9 @@
 pragma solidity ^0.8.20;
 
 import { Script } from "forge-std/Script.sol";
-import {MockV3Aggregator} from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
-import {ERC20Mock} from "../test/mocks/ERC20Mock.sol";
-import {console} from "forge-std/console.sol";
+import { MockV3Aggregator } from "@chainlink/contracts/src/v0.8/tests/MockV3Aggregator.sol";
+import { ERC20Mock } from "../test/mocks/ERC20Mock.sol";
+import { console } from "forge-std/console.sol";
 
 contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
@@ -54,9 +54,9 @@ contract HelperConfig is Script {
         MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(DECIMALS, BTC_USD_PRICE);
         ERC20Mock wbtcMock = new ERC20Mock("WBTC", "WBTC", msg.sender, 1000e8);
         vm.stopBroadcast();
-        
+
         // console.log("wethUsdPriceFeed: ", address(ethUsdPriceFeed));
-        (,int256 price,,,) = ethUsdPriceFeed.latestRoundData();
+        (, int256 price,,,) = ethUsdPriceFeed.latestRoundData();
         console.log("price: ", price);
 
         anvilNetworkConfig = NetworkConfig({

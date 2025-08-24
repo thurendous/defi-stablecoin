@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import {Test, console2} from "forge-std/Test.sol";
-import {DSCEngine} from "../../src/DSCEngine.sol";
-import {ERC20Mock} from "../mocks/ERC20Mock.sol";
-import {HelperConfig} from "../../script/HelperConfig.s.sol";
-import {DeployDSC} from "../../script/DeployDSC.s.sol";
-import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
-
+import { Test, console2 } from "forge-std/Test.sol";
+import { DSCEngine } from "../../src/DSCEngine.sol";
+import { ERC20Mock } from "../mocks/ERC20Mock.sol";
+import { HelperConfig } from "../../script/HelperConfig.s.sol";
+import { DeployDSC } from "../../script/DeployDSC.s.sol";
+import { DecentralizedStableCoin } from "../../src/DecentralizedStableCoin.sol";
 
 contract DSCEngineTest is Test {
     DeployDSC public deployer;
@@ -28,7 +27,7 @@ contract DSCEngineTest is Test {
         deployer = new DeployDSC();
         (dsc, dsce, config) = deployer.run();
         // activeNetworkConfig returns: (wethUsdPriceFeed, wbtcUsdPriceFeed, weth, wbtc, deployerKey)
-        (ethUsdPriceFeed, wbtcUsdPriceFeed, weth, wbtc, ) = config.activeNetworkConfig();
+        (ethUsdPriceFeed, wbtcUsdPriceFeed, weth, wbtc,) = config.activeNetworkConfig();
         ERC20Mock(weth).mint(USER, STARTING_ERC20_BALANCE);
     }
 
@@ -46,7 +45,6 @@ contract DSCEngineTest is Test {
         assertEq(expectedUsd, actualUsd);
     }
 
-
     /////////////////////////////////////
     ////// DepositCollateral tests //////
     /////////////////////////////////////
@@ -58,7 +56,5 @@ contract DSCEngineTest is Test {
         vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
         dsce.depositCollateral(weth, 0);
         vm.stopPrank();
-
     }
-
 }

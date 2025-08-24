@@ -4,13 +4,19 @@ out = "out"
 libs = ["lib"]
 remappings = [
     "@openzeppelin/contracts=lib/openzeppelin-contracts/contracts",
-    "@chainlink/contracts=lib/chainlink-brownie-contracts/contracts"
+    "@chainlink/contracts=lib/chainlink-brownie-contracts/contracts",
 ]
 
 
 [fmt]
 line_length = 120
-tab_width   = 4
+tab_width = 4
 bracket_spacing = true
+
+
+[invariant]
+runs = 1024
+depth = 128
+fail_on_revert = false
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

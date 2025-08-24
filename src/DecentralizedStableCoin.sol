@@ -64,6 +64,12 @@ contract DecentralizedStableCoin is ERC20Burnable, Ownable {
         super.burn(_amount);
     }
 
+    /// @notice limit the burnFrom function to only allow the owner to burn DSC
+    /// @dev If not do this, anyone who got approved can burn DSC to cause the ledger in DSCEngine to be out of sync
+    function burnFrom(address account, uint256 amount) public override onlyOwner {
+        super.burnFrom(account, amount);
+    }
+
     function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
         if (_amount <= 0) {
             revert DecentralizedStableCoin__AmountMustBeMoreThanZero();
