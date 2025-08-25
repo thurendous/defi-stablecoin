@@ -265,8 +265,8 @@ contract DSCEngine is ReentrancyGuard {
     ////// Private & Internal View Functions //////
     ///////////////////////////////////////////////
 
-    function _getAccountInformation(address user)
-        internal
+    function getAccountInformation(address user)
+        public
         view
         returns (uint256 totalDscMinted, uint256 totalCollateralValueInUsd)
     {
@@ -280,7 +280,8 @@ contract DSCEngine is ReentrancyGuard {
     function _healthFactor(address user) internal view returns (uint256) {
         // total DSC minted
         // total collateral value
-        (uint256 totalDscMinted, uint256 totalCollateralValueInUsd) = _getAccountInformation(user);
+        (uint256 totalDscMinted, uint256 totalCollateralValueInUsd) = getAccountInformation(user);
+        if (totalDscMinted == 0) return type(uint256).max;
         uint256 collateralAdjustedForThreshold =
             (totalCollateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
         return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;

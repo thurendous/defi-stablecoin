@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.18;
 
-import { Test } from "forge-std/Test.sol";
+import { Test, console } from "forge-std/Test.sol";
 import { ERC20Mock } from "../mocks/ERC20Mock.sol";
 import { DSCEngine } from "../../src/DSCEngine.sol";
 import { DecentralizedStableCoin } from "../../src/DecentralizedStableCoin.sol";
@@ -15,6 +15,9 @@ contract HandlerTest is Test {
     ERC20Mock public wbtc;
     DSCEngine public dsce;
     DecentralizedStableCoin public dsc;
+
+    uint256 public timesMintIsCalled;
+    address[] public usersWithCollateralDeposited;
 
     uint256 MAX_DEPOSIT_SIZE = type(uint96).max;
 
@@ -37,22 +40,43 @@ contract HandlerTest is Test {
         // Assert
     }
 
+    function mintDsc(uint256 amount, uint256 addressSeed) public {
+        amount = bound(amount, 1, MAX_DEPOSIT_SIZE);
+        if (usersWithCollateralDeposited.length == 0) {
+            return;
+        }
+        address sender = usersWithCollateralDeposited[addressSeed % usersWithCollateralDeposited.length];
+        vm.startPrank(sender);
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(sender);
+        int256 maxDscToMint = (int256(collateralValueInUsd) / 2) - int256(totalDscMinted);
+        if (maxDscToMint <= 0) {
+            return;
+        }
+        amount = bound(amount, 1, uint256(maxDscToMint));
+        dsce.mintDsc(amount);
+        vm.stopPrank();
+        timesMintIsCalled++;
+    }
+
     function depositCollateral(uint256 collateralAmount) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralAmount);
         uint256 amountCollateral = bound(collateralAmount, 1, MAX_DEPOSIT_SIZE);
-
-        vm.startPrank(msg.sender);
         collateral.mint(msg.sender, amountCollateral);
+        vm.startPrank(msg.sender);
         collateral.approve(address(dsce), amountCollateral);
         dsce.depositCollateral(address(collateral), amountCollateral);
         vm.stopPrank();
+        // double push
+        usersWithCollateralDeposited.push(msg.sender);
     }
 
     function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
         uint256 maxCollateralToRedeem = dsce.getCollateralBalanceOfUser(msg.sender, address(collateral));
-        uint256 amountToRedeem = bound(amountCollateral, 1, maxCollateralToRedeem);
-
+        uint256 amountToRedeem = bound(amountCollateral, 0, maxCollateralToRedeem);
+        if (amountToRedeem == 0) {
+            return;
+        }
         vm.startPrank(msg.sender);
         dsce.redeemCollateral(address(collateral), amountToRedeem); // TODO: add health factor check
         vm.stopPrank();

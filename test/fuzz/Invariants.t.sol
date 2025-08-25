@@ -10,7 +10,7 @@
 
 pragma solidity ^0.8.18;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {DeployDSC} from "../../script/DeployDSC.s.sol";
@@ -39,6 +39,9 @@ contract Invariants is StdInvariant, Test {
     function invariant_protocolMustHaveMoreValueThanTotalSupplyDollars() public view {
         // get the value of all the collateral in the protocol
         // compare it to all the debt (dsc)
+        console.log("mint got called: %s", handler.timesMintIsCalled());
+        console.log("total supply: %s", dsc.totalSupply());
+        
         uint256 totalSupply = dsc.totalSupply();
         uint256 totalWethDeposited = IERC20(weth).balanceOf(address(dsce));
         uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(dsce));
@@ -46,5 +49,12 @@ contract Invariants is StdInvariant, Test {
         uint256 wethValue = dsce.getUsdValue(weth, totalWethDeposited);
         uint256 wbtcValue = dsce.getUsdValue(wbtc, totalWbtcDeposited);
         assert(wethValue + wbtcValue >= totalSupply);
+    }
+
+    function gettersShouldNeverRevert() public view {
+        dsce.getTokenAmountFromUsd(weth, 100 ether);
+        dsce.getTokenAmountFromUsd(wbtc, 100 ether);
+        dsce.getUsdValue(weth, 100 ether);
+        dsce.getUsdValue(wbtc, 100 ether);
     }
 }
